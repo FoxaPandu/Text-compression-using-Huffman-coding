@@ -1,0 +1,140 @@
+import tkinter as tk
+from tkinter import ttk, filedialog
+from collections import Counter
+import heapq
+
+class HuffmanNode:
+    def __init__(self, char, freq):
+        self.char = char
+        self.freq = freq
+        self.left = None
+        self.right = None
+    
+    def __lt__(self, other):
+        return self.freq < other.freq
+
+class HuffmanCoding:
+    def build_tree(self, text):
+        freq = Counter(text)
+        heap = [HuffmanNode(char, freq) for char, freq in freq.items()]
+        heapq.heapify(heap)
+
+        while len(heap) > 1:
+            left = heapq.heappop(heap)
+            right = heapq.heappop(heap)
+            merged = HuffmanNode(None, left.freq + right.freq)
+            merged.left = left
+            merged.right = right
+            heapq.heappush(heap, merged)
+
+        return heap[0]
+
+    def generate_codes(self, root, current_code="", codes={}):
+        if not root:
+            return
+        if root.char:
+            codes[root.char] = current_code
+        self.generate_codes(root.left, current_code + "0", codes)
+        self.generate_codes(root.right, current_code + "1", codes)
+        return codes
+
+    def encode(self, text, codes):
+        return ''.join(codes[char] for char in text)
+
+    def decode(self, encoded_text, root):
+        decoded_text = ""
+        node = root
+        for bit in encoded_text:
+            node = node.left if bit == '0' else node.right
+            if node.char:
+                decoded_text += node.char
+                node = root
+        return decoded_text
+
+class HuffmanApp:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Huffman Coding Text Compressor")
+        self.root.geometry("900x600")
+        self.root.configure(bg="#1a1a1a")
+
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("TButton", font=("Arial", 12), padding=6)
+        style.configure("TLabel", background="#1a1a1a", foreground="white")
+        
+        self.setup_ui()
+        self.huffman = HuffmanCoding()
+        self.root.mainloop()
+
+    def setup_ui(self):
+        ttk.Label(self.root, text="Enter Text:").pack(pady=5)
+        self.input_box = tk.Text(self.root, height=7, bg="#111", fg="white", insertbackground="white")
+        self.input_box.pack(fill="x", padx=10)
+
+        btn_frame = ttk.Frame(self.root)
+        btn_frame.pack(pady=10)
+
+        ttk.Button(btn_frame, text="Load File", command=self.load_file).grid(row=0, column=0, padx=10)
+        ttk.Button(btn_frame, text="Encode (Compress)", command=self.run_huffman).grid(row=0, column=1, padx=10)
+        ttk.Button(btn_frame, text="Decode (Restore)", command=self.decode_text).grid(row=0, column=2, padx=10)
+        ttk.Button(btn_frame, text="Copy Encoded", command=self.copy_encoded).grid(row=0, column=3, padx=10)
+        ttk.Button(btn_frame, text="Save Encoded", command=self.save_encoded).grid(row=0, column=4, padx=10)
+
+        ttk.Label(self.root, text="Encoded Output:").pack()
+        self.encoded_box = tk.Text(self.root, height=6, bg="black", fg="#00ff9f", insertbackground="white")
+        self.encoded_box.pack(fill="x", padx=10)
+
+        ttk.Label(self.root, text="Decoded Output:").pack()
+        self.decoded_box = tk.Text(self.root, height=4, bg="#111", fg="white", insertbackground="white")
+        self.decoded_box.pack(fill="x", padx=10)
+
+        self.info_label = ttk.Label(self.root, text="")
+        self.info_label.pack()
+
+    def load_file(self):
+        path = filedialog.askopenfilename()
+        if path:
+            with open(path, 'r') as f:
+                self.input_box.delete("1.0", tk.END)
+                self.input_box.insert(tk.END, f.read())
+
+    def run_huffman(self):
+        text = self.input_box.get("1.0", tk.END).strip()
+        if not text:
+            return
+        self.root_node = self.huffman.build_tree(text)
+        self.codes = self.huffman.generate_codes(self.root_node)
+        encoded = self.huffman.encode(text, self.codes)
+
+        self.encoded_box.delete('1.0', tk.END)
+        self.encoded_box.insert(tk.END, encoded)
+
+        original_bits = len(text) * 8
+        compressed_bits = len(encoded)
+        ratio = round((1 - compressed_bits/original_bits) * 100, 2)
+
+        self.info_label.config(text=f"Compression Ratio: {ratio}%")
+
+    def decode_text(self):
+        encoded = self.encoded_box.get("1.0", tk.END).strip()
+        if encoded:
+            decoded = self.huffman.decode(encoded, self.root_node)
+            self.decoded_box.delete("1.0", tk.END)
+            self.decoded_box.insert(tk.END, decoded)
+
+    def save_encoded(self):
+        encoded = self.encoded_box.get('1.0', tk.END).strip()
+        if not encoded:
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".bin", filetypes=[("Binary File", "*.bin")])
+        if path:
+            with open(path, "w") as f:
+                f.write(encoded)
+
+    def copy_encoded(self):
+        encoded = self.encoded_box.get('1.0', tk.END)
+        self.root.clipboard_clear()
+        self.root.clipboard_append(encoded)
+
+HuffmanApp()
